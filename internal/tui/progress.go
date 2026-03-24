@@ -14,7 +14,17 @@ type CloneStatus struct {
 	Err     error
 }
 
-func progressView(statuses []CloneStatus, currentTask string, done bool, spinnerView string) string {
+func progressVisibleCount(termHeight int) int {
+	// overhead: logo 8 + blanks 2 + subtitle 1 + blank 1 + spinner 2 + summary 6 + help 2 + border/padding 4 + scroll hints 2 = 28
+	const overhead = 28
+	visible := termHeight - overhead
+	if visible < 5 {
+		visible = 5
+	}
+	return visible
+}
+
+func progressView(statuses []CloneStatus, currentTask string, done bool, spinnerView string, offset, termHeight int) string {
 	s := renderLogo() + "\n\n"
 
 	if !done {
@@ -23,7 +33,27 @@ func progressView(statuses []CloneStatus, currentTask string, done bool, spinner
 		s += subtitleStyle.Render("Setup complete!") + "\n\n"
 	}
 
-	for _, st := range statuses {
+	visible := progressVisibleCount(termHeight)
+	total := len(statuses)
+
+	if offset < 0 {
+		offset = 0
+	}
+	if total > visible && offset > total-visible {
+		offset = total - visible
+	}
+
+	if offset > 0 {
+		s += dimStyle.Render(fmt.Sprintf("  ↑ %d more above", offset)) + "\n"
+	}
+
+	end := offset + visible
+	if end > total {
+		end = total
+	}
+
+	for i := offset; i < end; i++ {
+		st := statuses[i]
 		icon := successStyle.Render("✓")
 		if !st.Success {
 			icon = errorStyle.Render("✗")
@@ -39,6 +69,11 @@ func progressView(statuses []CloneStatus, currentTask string, done bool, spinner
 			line += errorStyle.Render(fmt.Sprintf(" — %v", st.Err))
 		}
 		s += line + "\n"
+	}
+
+	remaining := total - end
+	if remaining > 0 {
+		s += dimStyle.Render(fmt.Sprintf("  ↓ %d more below", remaining)) + "\n"
 	}
 
 	if !done && currentTask != "" {

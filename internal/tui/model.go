@@ -83,11 +83,12 @@ type Model struct {
 	installPoetry   bool
 
 	// Cloning progress
-	spinner      spinner.Model
-	cloneResults []CloneStatus
-	currentTask  string
-	cloneQueue   []cloneJob
-	cloneIndex   int
+	spinner        spinner.Model
+	cloneResults   []CloneStatus
+	currentTask    string
+	cloneQueue     []cloneJob
+	cloneIndex     int
+	progressOffset int
 }
 
 type cloneJob struct {
@@ -177,9 +178,9 @@ func (m Model) View() string {
 	case stepPython:
 		return pythonView(m.pythonVersion, m.pythonAvailable, m.pyenvAvailable, m.poetryAvailable)
 	case stepCloning:
-		return progressView(m.cloneResults, m.currentTask, false, m.spinner.View())
+		return progressView(m.cloneResults, m.currentTask, false, m.spinner.View(), m.progressOffset, m.termHeight)
 	case stepDone:
-		return progressView(m.cloneResults, "", true, "")
+		return progressView(m.cloneResults, "", true, "", m.progressOffset, m.termHeight)
 	}
 	return ""
 }
@@ -676,6 +677,12 @@ func (m Model) updateCloning(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		m.cloneIndex++
 
+		// Auto-scroll to keep latest result visible
+		visible := progressVisibleCount(m.termHeight)
+		if len(m.cloneResults) > visible {
+			m.progressOffset = len(m.cloneResults) - visible
+		}
+
 		if m.cloneIndex < len(m.cloneQueue) {
 			m.currentTask = taskLabel(m.cloneQueue[m.cloneIndex].name)
 			return m, m.runNextClone()
@@ -705,6 +712,15 @@ func (m Model) updateDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "enter", "ctrl+c":
 			return m, tea.Quit
+		case "up", "k":
+			if m.progressOffset > 0 {
+				m.progressOffset--
+			}
+		case "down", "j":
+			visible := progressVisibleCount(m.termHeight)
+			if m.progressOffset < len(m.cloneResults)-visible {
+				m.progressOffset++
+			}
 		}
 	}
 	return m, nil
