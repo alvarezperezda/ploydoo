@@ -20,15 +20,15 @@ func CloneOCAModule(baseDir, module, version string) error {
 	return runClone(url, version, dest, 1)
 }
 
-// CloneAlventiaModules clones the alventia_modules repository with the given branch.
-func CloneAlventiaModules(baseDir, branch string) error {
-	dest := filepath.Join(baseDir, "addons", "alventia_modules")
-	return runClone("git@github.com:daperez89/alventia_modules.git", branch, dest, 1)
+// CloneCustomAddons clones a custom addons repository with the given branch.
+func CloneCustomAddons(baseDir, repoURL, branch string) error {
+	dest := filepath.Join(baseDir, "addons", "custom_addons")
+	return runClone(repoURL, branch, dest, 1)
 }
 
-// ListAlventiaBranches returns the list of remote branches for alventia_modules.
-func ListAlventiaBranches() ([]string, error) {
-	cmd := exec.Command("git", "ls-remote", "--heads", "git@github.com:daperez89/alventia_modules.git")
+// ListRemoteBranches returns the list of remote branches for the given repository URL.
+func ListRemoteBranches(repoURL string) ([]string, error) {
+	cmd := exec.Command("git", "ls-remote", "--heads", repoURL)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", err, string(output))

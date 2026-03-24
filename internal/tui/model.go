@@ -22,7 +22,9 @@ const (
 	stepPath step = iota
 	stepVersion
 	stepModules
-	stepAlventia
+	stepCustomAddons
+	stepCustomURL
+	stepCustomBranch
 	stepPostgres
 	stepDBConfig
 	stepPython
@@ -61,13 +63,16 @@ type Model struct {
 	dbActiveField int
 	dbErr         string
 
-	// Alventia branch selection
-	alventiaBranches []string
-	alventiaCursor   int
-	alventiaOffset   int
-	alventiaBranch   string
-	alventiaLoading  bool
-	alventiaErr      string
+	// Custom addons
+	customAddons   bool
+	customURL      string
+	customURLErr   string
+	customBranches []string
+	customCursor   int
+	customOffset   int
+	customBranch   string
+	customLoading  bool
+	customBranchErr string
 
 	// Python environment
 	pythonVersion   string
@@ -98,7 +103,7 @@ type cloneResultMsg struct {
 
 type allDoneMsg struct{}
 
-type alventiaBranchesMsg struct {
+type customBranchesMsg struct {
 	branches []string
 	err      error
 }
@@ -131,8 +136,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateVersion(msg)
 	case stepModules:
 		return m.updateModules(msg)
-	case stepAlventia:
-		return m.updateAlventia(msg)
+	case stepCustomAddons:
+		return m.updateCustomAddons(msg)
+	case stepCustomURL:
+		return m.updateCustomURL(msg)
+	case stepCustomBranch:
+		return m.updateCustomBranch(msg)
 	case stepPostgres:
 		return m.updatePostgres(msg)
 	case stepDBConfig:
@@ -155,8 +164,12 @@ func (m Model) View() string {
 		return versionView(m.versionCursor)
 	case stepModules:
 		return modulesView(m.moduleCursor, m.moduleSelected, m.moduleOffset, m.termHeight)
-	case stepAlventia:
-		return alventiaView(m.alventiaBranches, m.alventiaCursor, m.alventiaLoading, m.alventiaErr, m.alventiaOffset, m.termHeight)
+	case stepCustomAddons:
+		return customAddonsView()
+	case stepCustomURL:
+		return customURLView(m.customURL, m.customURLErr)
+	case stepCustomBranch:
+		return customBranchView(m.customBranches, m.customCursor, m.customLoading, m.customBranchErr, m.customOffset, m.termHeight)
 	case stepPostgres:
 		return postgresView(m.pgCursor)
 	case stepDBConfig:
@@ -265,12 +278,7 @@ func (m Model) updateModules(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.moduleSelected[i] = false
 			}
 		case "enter":
-			m.step = stepAlventia
-			m.alventiaLoading = true
-			return m, func() tea.Msg {
-				branches, err := gitops.ListAlventiaBranches()
-				return alventiaBranchesMsg{branches: branches, err: err}
-			}
+			m.step = stepCustomAddons
 		}
 	}
 
@@ -286,21 +294,77 @@ func (m Model) updateModules(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// --- Alventia step ---
+// --- Custom Addons step ---
 
-func (m Model) updateAlventia(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) updateCustomAddons(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case alventiaBranchesMsg:
-		m.alventiaLoading = false
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "y":
+			m.customAddons = true
+			m.step = stepCustomURL
+		case "n":
+			m.customAddons = false
+			m.step = stepPostgres
+		}
+	}
+	return m, nil
+}
+
+// --- Custom URL step ---
+
+func (m Model) updateCustomURL(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC:
+			return m, tea.Quit
+		case tea.KeyBackspace:
+			if len(m.customURL) > 0 {
+				m.customURL = m.customURL[:len(m.customURL)-1]
+			}
+			m.customURLErr = ""
+		case tea.KeyEnter:
+			if m.customURL == "" {
+				m.customURLErr = "URL cannot be empty"
+				return m, nil
+			}
+			m.customURLErr = ""
+			m.customLoading = true
+			m.step = stepCustomBranch
+			repoURL := m.customURL
+			return m, func() tea.Msg {
+				branches, err := gitops.ListRemoteBranches(repoURL)
+				return customBranchesMsg{branches: branches, err: err}
+			}
+		case tea.KeyRunes:
+			m.customURL += string(msg.Runes)
+			m.customURLErr = ""
+		case tea.KeySpace:
+			m.customURL += " "
+			m.customURLErr = ""
+		}
+	}
+	return m, nil
+}
+
+// --- Custom Branch step ---
+
+func (m Model) updateCustomBranch(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case customBranchesMsg:
+		m.customLoading = false
 		if msg.err != nil {
-			m.alventiaErr = fmt.Sprintf("Failed to fetch branches: %v", msg.err)
+			m.customBranchErr = fmt.Sprintf("Failed to fetch branches: %v", msg.err)
 		} else {
-			m.alventiaBranches = msg.branches
+			m.customBranches = msg.branches
 		}
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.alventiaLoading {
+		if m.customLoading {
 			if msg.String() == "ctrl+c" {
 				return m, tea.Quit
 			}
@@ -311,29 +375,29 @@ func (m Model) updateAlventia(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up", "k":
-			if m.alventiaCursor > 0 {
-				m.alventiaCursor--
+			if m.customCursor > 0 {
+				m.customCursor--
 			}
 		case "down", "j":
-			if m.alventiaCursor < len(m.alventiaBranches)-1 {
-				m.alventiaCursor++
+			if m.customCursor < len(m.customBranches)-1 {
+				m.customCursor++
 			}
 		case "enter":
-			if len(m.alventiaBranches) > 0 {
-				m.alventiaBranch = m.alventiaBranches[m.alventiaCursor]
+			if len(m.customBranches) > 0 {
+				m.customBranch = m.customBranches[m.customCursor]
 			}
 			m.step = stepPostgres
 		}
 	}
 
 	// Adjust scroll offset
-	if len(m.alventiaBranches) > 0 {
-		visible := alventiaVisibleCount(m.termHeight)
-		if m.alventiaCursor < m.alventiaOffset {
-			m.alventiaOffset = m.alventiaCursor
+	if len(m.customBranches) > 0 {
+		visible := customBranchVisibleCount(m.termHeight)
+		if m.customCursor < m.customOffset {
+			m.customOffset = m.customCursor
 		}
-		if m.alventiaCursor >= m.alventiaOffset+visible {
-			m.alventiaOffset = m.alventiaCursor - visible + 1
+		if m.customCursor >= m.customOffset+visible {
+			m.customOffset = m.customCursor - visible + 1
 		}
 	}
 
@@ -492,13 +556,16 @@ func (m *Model) buildCloneQueue() {
 		}
 	}
 
-	alvBranch := m.alventiaBranch
-	m.cloneQueue = append(m.cloneQueue, cloneJob{
-		name: "alventia_modules",
-		fn: func() error {
-			return gitops.CloneAlventiaModules(baseDir, alvBranch)
-		},
-	})
+	if m.customAddons && m.customURL != "" && m.customBranch != "" {
+		customURL := m.customURL
+		customBranch := m.customBranch
+		m.cloneQueue = append(m.cloneQueue, cloneJob{
+			name: "custom_addons",
+			fn: func() error {
+				return gitops.CloneCustomAddons(baseDir, customURL, customBranch)
+			},
+		})
+	}
 
 	m.cloneQueue = append(m.cloneQueue, cloneJob{
 		name: "postgres-container",
@@ -612,7 +679,7 @@ func (m Model) updateCloning(msg tea.Msg) (tea.Model, tea.Cmd) {
 				selectedMods = append(selectedMods, mod)
 			}
 		}
-		_ = config.GenerateOdooConf(m.installPath, selectedMods, true, m.version, m.dbFields[dbFieldUser], m.dbFields[dbFieldPassword], m.dbFields[dbFieldName])
+		_ = config.GenerateOdooConf(m.installPath, selectedMods, m.customAddons, m.version, m.dbFields[dbFieldUser], m.dbFields[dbFieldPassword], m.dbFields[dbFieldName])
 		m.step = stepDone
 		return m, nil
 	}

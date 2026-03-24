@@ -2,18 +2,40 @@ package tui
 
 import "fmt"
 
-func alventiaView(branches []string, cursor int, loading bool, loadErr string, offset, termHeight int) string {
+func customAddonsView() string {
 	s := renderLogo() + "\n\n"
-	s += subtitleStyle.Render("Select alventia_modules branch:") + "\n\n"
+	s += subtitleStyle.Render("Do you have a custom addons repository?") + "\n\n"
+	s += "  " + infoStyle.Render("y") + " Yes\n"
+	s += "  " + infoStyle.Render("n") + " No\n"
+	s += "\n" + helpStyle.Render("y/n choose • ctrl+c quit")
+	return boxStyle.Render(s)
+}
+
+func customURLView(input string, urlErr string) string {
+	s := renderLogo() + "\n\n"
+	s += subtitleStyle.Render("Enter custom addons repository URL:") + "\n\n"
+	s += fmt.Sprintf("  %s%s\n", infoStyle.Render("> "), input)
+
+	if urlErr != "" {
+		s += "\n" + errorStyle.Render("  "+urlErr)
+	}
+
+	s += "\n" + helpStyle.Render("Type the git repo URL • enter confirm • ctrl+c quit")
+	return boxStyle.Render(s)
+}
+
+func customBranchView(branches []string, cursor int, loading bool, branchErr string, offset, termHeight int) string {
+	s := renderLogo() + "\n\n"
+	s += subtitleStyle.Render("Select branch for custom addons:") + "\n\n"
 
 	if loading {
 		s += dimStyle.Render("  Fetching branches...") + "\n"
 		return boxStyle.Render(s)
 	}
 
-	if loadErr != "" {
-		s += errorStyle.Render("  "+loadErr) + "\n"
-		s += "\n" + helpStyle.Render("enter skip alventia • q quit")
+	if branchErr != "" {
+		s += errorStyle.Render("  "+branchErr) + "\n"
+		s += "\n" + helpStyle.Render("enter skip custom addons • q quit")
 		return boxStyle.Render(s)
 	}
 
@@ -23,7 +45,7 @@ func alventiaView(branches []string, cursor int, loading bool, loadErr string, o
 		return boxStyle.Render(s)
 	}
 
-	visible := alventiaVisibleCount(termHeight)
+	visible := customBranchVisibleCount(termHeight)
 
 	if offset < 0 {
 		offset = 0
@@ -63,7 +85,7 @@ func alventiaView(branches []string, cursor int, loading bool, loadErr string, o
 	return boxStyle.Render(s)
 }
 
-func alventiaVisibleCount(termHeight int) int {
+func customBranchVisibleCount(termHeight int) int {
 	const overhead = 20
 	visible := termHeight - overhead
 	if visible < 5 {

@@ -8,7 +8,7 @@ import (
 )
 
 // GenerateOdooConf creates an odoo.conf file with the given addons paths.
-func GenerateOdooConf(baseDir string, ocaModules []string, includeAlventia bool, odooVersion, dbUser, dbPassword, dbName string) error {
+func GenerateOdooConf(baseDir string, ocaModules []string, includeCustomAddons bool, odooVersion, dbUser, dbPassword, dbName string) error {
 	paths := []string{
 		"./odoo/addons",
 		"./odoo/odoo/addons",
@@ -18,8 +18,8 @@ func GenerateOdooConf(baseDir string, ocaModules []string, includeAlventia bool,
 		paths = append(paths, fmt.Sprintf("./addons/%s", mod))
 	}
 
-	if includeAlventia {
-		paths = append(paths, "./addons/alventia_modules")
+	if includeCustomAddons {
+		paths = append(paths, "./addons/custom_addons")
 	}
 
 	conf := fmt.Sprintf(`[options]
