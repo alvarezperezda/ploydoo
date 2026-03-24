@@ -84,13 +84,43 @@ func InstallPythonWithPyenv(version string) error {
 	return nil
 }
 
+// InstallPoetry installs Poetry using pipx, or pip as fallback.
+func InstallPoetry() error {
+	// Try pipx first
+	if _, err := exec.LookPath("pipx"); err == nil {
+		cmd := exec.Command("pipx", "install", "poetry")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("pipx install poetry failed: %w: %s", err, string(output))
+		}
+		return nil
+	}
+
+	// Try pip3 as fallback
+	if _, err := exec.LookPath("pip3"); err == nil {
+		cmd := exec.Command("pip3", "install", "--user", "poetry")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("pip3 install poetry failed: %w: %s", err, string(output))
+		}
+		return nil
+	}
+
+	return fmt.Errorf("neither pipx nor pip3 found — install Poetry manually: https://python-poetry.org/docs/#installation")
+}
+
 // GeneratePyprojectToml parses the Odoo requirements.txt and generates a pyproject.toml.
 func GeneratePyprojectToml(baseDir, pythonVersion string) error {
 	reqPath := filepath.Join(baseDir, "odoo", "requirements.txt")
-	deps, err := parseRequirements(reqPath, pythonVersion)
-	if err != nil {
-		return fmt.Errorf("failed to parse requirements.txt: %w", err)
+	var deps []string
+	if _, err := os.Stat(reqPath); err == nil {
+		var parseErr error
+		deps, parseErr = parseRequirements(reqPath, pythonVersion)
+		if parseErr != nil {
+			return fmt.Errorf("failed to parse requirements.txt: %w", parseErr)
+		}
 	}
+	// If requirements.txt doesn't exist (Odoo clone may have failed), generate minimal pyproject.toml
 
 	var sb strings.Builder
 	sb.WriteString("[tool.poetry]\n")

@@ -70,10 +70,12 @@ type Model struct {
 	alventiaErr      string
 
 	// Python environment
-	pythonVersion  string
+	pythonVersion   string
 	pythonAvailable bool
 	pyenvAvailable  bool
+	poetryAvailable bool
 	installPython   bool
+	installPoetry   bool
 
 	// Cloning progress
 	spinner      spinner.Model
@@ -160,7 +162,7 @@ func (m Model) View() string {
 	case stepDBConfig:
 		return dbConfigView(m.dbFields, m.dbActiveField, m.dbErr)
 	case stepPython:
-		return pythonView(m.pythonVersion, m.pythonAvailable, m.pyenvAvailable)
+		return pythonView(m.pythonVersion, m.pythonAvailable, m.pyenvAvailable, m.poetryAvailable)
 	case stepCloning:
 		return progressView(m.cloneResults, m.currentTask, false, m.spinner.View())
 	case stepDone:
@@ -410,6 +412,7 @@ func (m Model) updateDBConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pythonVersion = python.PythonVersionForOdoo(m.version)
 			m.pythonAvailable = python.CheckPythonAvailable(m.pythonVersion)
 			m.pyenvAvailable = python.CheckPyenvAvailable()
+			m.poetryAvailable = python.CheckPoetryAvailable()
 			m.step = stepPython
 		case tea.KeyRunes:
 			key := string(msg.Runes)
@@ -429,26 +432,33 @@ func (m Model) updateDBConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 // --- Python step ---
 
 func (m Model) updatePython(msg tea.Msg) (tea.Model, tea.Cmd) {
+	needsInstall := (!m.pythonAvailable && m.pyenvAvailable) || !m.poetryAvailable
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter":
-			// If python is available or pyenv is not available, just continue
-			m.step = stepCloning
-			m.buildCloneQueue()
-			return m, tea.Batch(m.spinner.Tick, m.runNextClone())
+			if !needsInstall {
+				m.step = stepCloning
+				m.buildCloneQueue()
+				return m, tea.Batch(m.spinner.Tick, m.runNextClone())
+			}
 		case "y":
-			if !m.pythonAvailable && m.pyenvAvailable {
-				m.installPython = true
+			if needsInstall {
+				if !m.pythonAvailable && m.pyenvAvailable {
+					m.installPython = true
+				}
+				if !m.poetryAvailable {
+					m.installPoetry = true
+				}
 				m.step = stepCloning
 				m.buildCloneQueue()
 				return m, tea.Batch(m.spinner.Tick, m.runNextClone())
 			}
 		case "n":
-			if !m.pythonAvailable && m.pyenvAvailable {
-				m.installPython = false
+			if needsInstall {
 				m.step = stepCloning
 				m.buildCloneQueue()
 				return m, tea.Batch(m.spinner.Tick, m.runNextClone())
@@ -508,6 +518,15 @@ func (m *Model) buildCloneQueue() {
 		})
 	}
 
+	if m.installPoetry {
+		m.cloneQueue = append(m.cloneQueue, cloneJob{
+			name: "poetry-install",
+			fn: func() error {
+				return python.InstallPoetry()
+			},
+		})
+	}
+
 	pyVer := m.pythonVersion
 	installPath := m.installPath
 	m.cloneQueue = append(m.cloneQueue, cloneJob{
@@ -536,6 +555,8 @@ func taskLabel(name string) string {
 		return "Starting PostgreSQL container..."
 	case "python-install":
 		return "Installing Python with pyenv..."
+	case "poetry-install":
+		return "Installing Poetry..."
 	case "pyproject-toml":
 		return "Generating pyproject.toml..."
 	case "poetry-setup":

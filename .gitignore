@@ -2,3 +2,7 @@ ploydoo
 odoo-cli
 dist/
 .DS_Store
+.agents/
+.mcp.json
+*.code-workspace
+skills-lock.json
