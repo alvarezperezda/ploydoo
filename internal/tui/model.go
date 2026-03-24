@@ -426,6 +426,13 @@ func (m Model) updatePostgres(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.dbFields[dbFieldUser] = "odoo"
 			m.dbFields[dbFieldPassword] = "odoo"
 			m.dbFields[dbFieldName] = fmt.Sprintf("odoo-%s", m.version)
+			// Detect if port 5432 is in use
+			if docker.IsPortInUse("5432") {
+				m.dbFields[dbFieldPort] = "5433"
+				m.dbErr = "Port 5432 is in use — defaulting to 5433"
+			} else {
+				m.dbFields[dbFieldPort] = "5432"
+			}
 			m.step = stepDBConfig
 		}
 	}
@@ -470,6 +477,10 @@ func (m Model) updateDBConfig(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if m.dbFields[dbFieldName] == "" {
 				m.dbErr = "Database name cannot be empty"
+				return m, nil
+			}
+			if m.dbFields[dbFieldPort] == "" {
+				m.dbErr = "Port cannot be empty"
 				return m, nil
 			}
 			// Determine Python version and check availability
@@ -570,7 +581,7 @@ func (m *Model) buildCloneQueue() {
 	m.cloneQueue = append(m.cloneQueue, cloneJob{
 		name: "postgres-container",
 		fn: func() error {
-			return docker.StartPostgres(m.pgVersion, m.version, m.dbFields[dbFieldUser], m.dbFields[dbFieldPassword], m.dbFields[dbFieldName])
+			return docker.StartPostgres(m.pgVersion, m.version, m.dbFields[dbFieldUser], m.dbFields[dbFieldPassword], m.dbFields[dbFieldName], m.dbFields[dbFieldPort])
 		},
 	})
 
@@ -679,7 +690,7 @@ func (m Model) updateCloning(msg tea.Msg) (tea.Model, tea.Cmd) {
 				selectedMods = append(selectedMods, mod)
 			}
 		}
-		_ = config.GenerateOdooConf(m.installPath, selectedMods, m.customAddons, m.version, m.dbFields[dbFieldUser], m.dbFields[dbFieldPassword], m.dbFields[dbFieldName])
+		_ = config.GenerateOdooConf(m.installPath, selectedMods, m.customAddons, m.version, m.dbFields[dbFieldUser], m.dbFields[dbFieldPassword], m.dbFields[dbFieldName], m.dbFields[dbFieldPort])
 		m.step = stepDone
 		return m, nil
 	}

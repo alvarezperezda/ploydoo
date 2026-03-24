@@ -6,6 +6,7 @@ const (
 	dbFieldUser = iota
 	dbFieldPassword
 	dbFieldName
+	dbFieldPort
 	dbFieldCount
 )
 
@@ -13,6 +14,7 @@ var dbFieldLabels = [dbFieldCount]string{
 	"DB User",
 	"DB Password",
 	"DB Name",
+	"DB Port",
 }
 
 func dbConfigView(fields [dbFieldCount]string, activeField int, dbErr string) string {

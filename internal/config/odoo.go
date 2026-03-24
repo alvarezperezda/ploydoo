@@ -8,7 +8,7 @@ import (
 )
 
 // GenerateOdooConf creates an odoo.conf file with the given addons paths.
-func GenerateOdooConf(baseDir string, ocaModules []string, includeCustomAddons bool, odooVersion, dbUser, dbPassword, dbName string) error {
+func GenerateOdooConf(baseDir string, ocaModules []string, includeCustomAddons bool, odooVersion, dbUser, dbPassword, dbName, dbPort string) error {
 	paths := []string{
 		"./odoo/addons",
 		"./odoo/odoo/addons",
@@ -25,25 +25,25 @@ func GenerateOdooConf(baseDir string, ocaModules []string, includeCustomAddons b
 	conf := fmt.Sprintf(`[options]
 addons_path = %s
 db_host = localhost
-db_port = 5432
+db_port = %s
 db_user = %s
 db_password = %s
 db_name = %s
 admin_passwd = admin
 http_port = 8069
 log_level = info
-`, strings.Join(paths, ","), dbUser, dbPassword, dbName)
+`, strings.Join(paths, ","), dbPort, dbUser, dbPassword, dbName)
 
 	confPath := filepath.Join(baseDir, "odoo.conf")
 	if err := os.WriteFile(confPath, []byte(conf), 0644); err != nil {
 		return err
 	}
 
-	return GenerateStartScript(baseDir, dbUser, dbPassword, dbName)
+	return GenerateStartScript(baseDir, dbUser, dbPassword, dbName, dbPort)
 }
 
 // GenerateStartScript creates a start.sh script that initializes the DB on first run and starts Odoo.
-func GenerateStartScript(baseDir, dbUser, dbPassword, dbName string) error {
+func GenerateStartScript(baseDir, dbUser, dbPassword, dbName, dbPort string) error {
 	script := fmt.Sprintf(`#!/bin/bash
 
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"
@@ -51,7 +51,7 @@ CONF="$BASEDIR/odoo.conf"
 ODOO_BIN="$BASEDIR/odoo/odoo-bin"
 DB_NAME="%s"
 DB_HOST="localhost"
-DB_PORT="5432"
+DB_PORT="%s"
 DB_USER="%s"
 DB_PASSWORD="%s"
 INIT_FLAG="$BASEDIR/.db_initialized"
@@ -102,7 +102,7 @@ fi
 
 echo "Starting Odoo..."
 exec poetry run python "$ODOO_BIN" -c "$CONF"
-`, dbName, dbUser, dbPassword)
+`, dbName, dbPort, dbUser, dbPassword)
 
 	scriptPath := filepath.Join(baseDir, "start.sh")
 	return os.WriteFile(scriptPath, []byte(script), 0755)
