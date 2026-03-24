@@ -16,7 +16,7 @@ func CloneOdoo(baseDir, version string) error {
 // CloneOCAModule clones an OCA module repository for the given version.
 func CloneOCAModule(baseDir, module, version string) error {
 	url := fmt.Sprintf("https://github.com/OCA/%s.git", module)
-	dest := filepath.Join(baseDir, "addons", module)
+	dest := filepath.Join(baseDir, "addons", "OCA", module)
 	return runClone(url, version, dest, 1)
 }
 

@@ -15,7 +15,7 @@ func GenerateOdooConf(baseDir string, ocaModules []string, includeCustomAddons b
 	}
 
 	for _, mod := range ocaModules {
-		paths = append(paths, fmt.Sprintf("./addons/%s", mod))
+		paths = append(paths, fmt.Sprintf("./addons/OCA/%s", mod))
 	}
 
 	if includeCustomAddons {
